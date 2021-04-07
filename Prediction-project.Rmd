@@ -1,0 +1,100 @@
+---
+title: "Prediction project"
+author: "Amir"
+date: "7 4 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+
+One thing that people regularly do is quantify how  much of a particular activity they do, but they rarely quantify how well they do it. In this project, I will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+## Load libraries, import and clean data
+
+```{r}
+library(caret)
+library(tidyverse)
+
+training<-read_csv("Data-science/pml-training.csv")
+testing<-read_csv("Data-science/pml-testing.csv")
+```
+
+some of the variables contain `NA` and `#DIV/0!` and thus we would have to do some cleanup.
+
+Some variables also have descriptive fields e.g. `X1`, `user_name`, `raw_timestamp_part_1`, `raw_timestamp_part_2`, `cvtd_timestamp`, `new_window`, `num_window` and thus we would have to remove them.
+
+```{r}
+training_new<-training %>%
+    select(!X1:num_window) %>% 
+      mutate(across(everything(), ~replace_na(.x, 0)), 
+             across(everything(), ~gsub("#DIV/0!", 0, .x)))
+```
+
+we will use the `nearZeroVar()` function to remove the variables with near zero variance.
+
+```{r}
+training_new<-training_new[, -nearZeroVar(training_new)] 
+training_new<-training_new %>%
+  mutate(across(1:52, as.numeric)) %>%
+  mutate(classe=factor(classe))
+```
+
+We are now left with 52 variables to use as predictors.
+
+## Model fitting
+
+First, we will create training and validation test sets.
+
+```{r}
+set.seed(4896)
+inTrain<-createDataPartition(training_new$classe, p=0.75, list=FALSE)
+train_set<-training_new[inTrain,]
+validate_set<-training_new[-inTrain,]
+```
+
+Now we will use the Random Forest model for classification with 5-fold cross validation.
+
+```{r}
+library(doParallel)
+cl<-makePSOCKcluster(0.75*detectCores())
+registerDoParallel(cl)
+rfCrossVal<-trainControl(method="cv", 5)
+rfFit<-train(classe~., data=train_set, method="rf", trControl=rfCrossVal)
+stopCluster(cl)
+rfFit
+```
+
+## Test the accuracy
+
+firt, we will Test the accuracy on the validation set
+
+```{r}
+rfPred<-predict(rfFit, validate_set)
+rfMat<-confusionMatrix(rfPred, validate_set$classe)
+rfMat$overall
+```
+
+The accuracy is 99.55% - that mean that the model predict pretty good!
+
+We will clean up the test set before we will test him.
+
+```{r}
+testing_new<-testing %>%
+    select(!X1:num_window) %>% 
+      mutate(across(everything(), ~replace_na(.x, 0)),
+             across(everything(), ~gsub("#DIV/0!", 0, .x)))
+testing_new<-testing_new[, -nearZeroVar(testing_new)] 
+testing_new<-testing_new %>%
+  select(!problem_id) %>%
+  mutate(across(1:52, as.numeric))
+```
+
+now we will test the test data set
+
+```{r}
+testPred<-predict(rfFit, testing_cleaned)
+testPred
+```

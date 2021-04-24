@@ -18,8 +18,11 @@ One thing that people regularly do is quantify how  much of a particular activit
 library(caret)
 library(tidyverse)
 
-training<-read_csv("Data-science/pml-training.csv")
-testing<-read_csv("Data-science/pml-testing.csv")
+trainSET <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testSET <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(trainSET))
+testing <- read.csv(url(testSET))
 ```
 
 some of the variables contain `NA` and `#DIV/0!` and thus we would have to do some cleanup.
